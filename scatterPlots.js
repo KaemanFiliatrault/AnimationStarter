@@ -1,3 +1,4 @@
+//gets the mean grade of an entry
 var getMeanGrade = function(entries)
 {
     return d3.mean(entries,function(entry)
@@ -5,15 +6,27 @@ var getMeanGrade = function(entries)
             return entry.grade;
         })
 }
-
-
-var drawScatter = function(students,target,
-              xScale,yScale,xProp,yProp)
+var getMaxGrade = function(students,prop)
 {
+    return d3.max(students,function(student)
+            {
+                return d3.max(student[prop], function(entry){return entry.grade;})
+            })
+}
 
+// draws the actual circles for the graph itself  based on the specific dataset of values and scales given to the method
+var drawScatter = function(students,target,
+              xProp,yProp,lengths)
+{
+    var scales = recalculateScales(students,xProp,yProp,lengths);
+    var xScale = scales.xScale;
+    var yScale = scales.yScale;
+    
+    updateAxes(target,xScale, yScale)
+    //Join
     setBanner(xProp.toUpperCase() +" vs "+ yProp.toUpperCase());
     
-    d3.select(target).select(".graph")
+    var circles = d3.select(target).select(".graph")
     .selectAll("circle")
     .data(students)
     .enter()
@@ -27,8 +40,42 @@ var drawScatter = function(students,target,
         return yScale(getMeanGrade(student[yProp]));    
     })
     .attr("r",4);
+    //Enter
+    circles.enter()
+        .append("circle")
+    //Exit
+    circles.exit()
+        .remove();
+    //Update
+    d3.select(target).select(".graph")
+        .selectAll("circle")
+        .transition()
+        .duration(1000)
+        .attr("cx",function(student)
+        {
+            return xScale(getMeanGrade(student[xProp]));    
+        })
+        .attr("cy",function(student)
+        {
+            return yScale(getMeanGrade(student[yProp]));    
+        })
+        .attr("r",4)
+   
 }
-
+var recalculateScales = function(students,xProp,yProp,lengths)
+{
+    
+    var xScale = d3.scaleLinear()
+        .domain([0,getMaxGrade(students,xProp)])
+        .range([0,lengths.graph.width])
+           
+    var yScale = d3.scaleLinear()
+        .domain([0,getMaxGrade(students,yProp)])
+        .range([lengths.graph.height,0])
+    return {xScale:xScale, yScale:yScale};
+    
+}
+//removes the data stored in d3 associated with the circles. Will remove the visual elements as well if they are still there.
 var clearScatter = function(target)
 {
     d3.select(target)
@@ -37,26 +84,41 @@ var clearScatter = function(target)
         .remove();
 }
 
-
+//creates Axes values usings scales and then moves them to their proper position on the screen based on margins.
 var createAxes = function(screen,margins,graph,
                            target,xScale,yScale)
 {
-    var xAxis = d3.axisBottom(xScale);
-    var yAxis = d3.axisLeft(yScale);
     
+
     var axes = d3.select(target)
         .append("g")
     axes.append("g")
         .attr("transform","translate("+margins.left+","
              +(margins.top+graph.height)+")")
-        .call(xAxis)
+        .attr("id","xAxis")
     axes.append("g")
         .attr("transform","translate("+margins.left+","
              +(margins.top)+")")
-        .call(yAxis)
+        .attr("id", "yAxis")
 }
 
+var updateAxes = function(target,xScale, yScale)
+{
+    var yAxis = d3.axisLeft(yScale);
 
+    var xAxis = d3.axisBottom(xScale);
+    
+    d3.select("#yAxis")
+        .transition()
+        .duration(1000)
+        .call(yAxis)
+    d3.select("#xAxis")
+        .transition()
+        .duration(1000)
+        .call(xAxis)
+}
+
+//creates the initial scales and the dimensions of the graph. Then calls methods that create buttons axes and a banner.
 var initGraph = function(target,students)
 {
     //the size of the screen
@@ -71,7 +133,11 @@ var initGraph = function(target,students)
         width:screen.width-margins.left-margins.right,
         height:screen.height-margins.top-margins.bottom,
     }
-    
+    var lengths = {
+        screen:screen,
+        margins:margins,
+        graph:graph
+    }
 
     //set the screen size
     d3.select(target)
@@ -84,69 +150,59 @@ var initGraph = function(target,students)
         .classed("graph",true)
         .attr("transform","translate("+margins.left+","+
              margins.top+")");
-        
-    //create scales for all of the dimensions
     
     
-    var xScale = d3.scaleLinear()
-        .domain([0,100])
-        .range([0,graph.width])
-           
-    var yScale = d3.scaleLinear()
-        .domain([0,100])
-        .range([graph.height,0])
   
     
+    createAxes(screen,margins,graph,target);
     
-    createAxes(screen,margins,graph,target,xScale,yScale);
-    
-    initButtons(students,target,xScale,yScale);
+    initButtons(students,target, lengths);
     
     setBanner("Click buttons to graphs");
     
     
 
 }
-
-var initButtons = function(students,target,xScale,yScale)
+// makes the buttons that allow you to switch between graphs
+var initButtons = function(students,target,lengths)
 {
     
     d3.select("#fvh")
     .on("click",function()
     {
-        clearScatter(target);
+        //clearScatter(target);
         drawScatter(students,target,
-              xScale,yScale,"final","homework");
+              "final","homework",lengths);
     })
     
     d3.select("#hvq")
     .on("click",function()
     {
-        clearScatter(target);
+        //clearScatter(target);
         drawScatter(students,target,
-              xScale,yScale,"homework","test");
+              "homework","test",lengths);
     })
     
     d3.select("#tvf")
     .on("click",function()
     {
-        clearScatter(target);
+        //clearScatter(target);
         drawScatter(students,target,
-              xScale,yScale,"test","final");
+              "test","final",lengths);
     })
     
     d3.select("#tvq")
     .on("click",function()
     {
-        clearScatter(target);
+        //clearScatter(target);
         drawScatter(students,target,
-              xScale,yScale,"test","quizes");
+              "test","quizes",lengths);
     })
     
     
     
 }
-
+// sets the banner of your graph based on a certain text argument
 var setBanner = function(msg)
 {
     d3.select("#banner")
@@ -154,7 +210,7 @@ var setBanner = function(msg)
     
 }
 
-
+//promise that loads the penguin data into the d3 and calls initGraph. Handles if there is an error during this process
 
 var penguinPromise = d3.json("/classData.json");
 
