@@ -212,7 +212,7 @@ var setBanner = function(msg)
 
 //promise that loads the penguin data into the d3 and calls initGraph. Handles if there is an error during this process
 
-var penguinPromise = d3.json("/classData.json");
+var penguinPromise = d3.json("classData.json");
 
 penguinPromise.then(function(penguins)
 {
